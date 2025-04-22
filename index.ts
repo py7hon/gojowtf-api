@@ -2,6 +2,12 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 console.log("Server running on Deno Deploy...");
 
+const headers = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname;
@@ -10,90 +16,82 @@ serve(async (req) => {
   const streamUrl = url.searchParams.get("url") || "";
 
   if (path === "/") {
-    const html = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Gojo API Docs</title>
-        <style>
-          body { font-family: sans-serif; padding: 2rem; line-height: 1.6; background: #f9f9f9; }
-          code { background: #eee; padding: 2px 5px; border-radius: 4px; }
-          h1 { color: #333; }
-        </style>
-      </head>
-      <body>
-        <h1>🔍 Gojo Anime API</h1>
-        <p>Welcome to the public API for Gojo anime search and streaming. Below are the available endpoints:</p>
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gojo API Docs</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; line-height: 1.6; background: #f9f9f9; }
+    code { background: #eee; padding: 2px 5px; border-radius: 4px; }
+    h1 { color: #333; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Gojo Anime API</h1>
+  <p>Welcome to the public API for Gojo anime search and streaming. Below are the available endpoints:</p>
 
-        <h2>📘 Endpoints</h2>
+  <h2>📘 Endpoints</h2>
+  <h3>1. Search Anime</h3>
+  <p><code>GET /api/search?q=naruto</code></p>
 
-        <h3>1. Search Anime</h3>
-        <p><code>GET /api/search?q=naruto</code></p>
-        <p>Returns a list of anime search results.</p>
+  <h3>2. Get Anime Details</h3>
+  <p><code>GET /api/details?id=12345</code></p>
 
-        <h3>2. Get Anime Details</h3>
-        <p><code>GET /api/details?id=12345</code></p>
-        <p>Fetch details about a specific anime.</p>
+  <h3>3. Get Episodes</h3>
+  <p><code>GET /api/episodes?id=12345</code></p>
 
-        <h3>3. Get Episodes</h3>
-        <p><code>GET /api/episodes?id=12345</code></p>
-        <p>List episodes with IDs across providers (pahe, zaza, strix).</p>
+  <h3>4. Get Stream URLs</h3>
+  <p><code>GET /api/stream?url=animeId/provider1/epNum/epId1/provider2/epNum/epId2</code></p>
 
-        <h3>4. Get Stream URLs</h3>
-        <p><code>GET /api/stream?url=animeId/provider1/epNum/epId1/provider2/epNum/epId2</code></p>
-        <p>Returns streaming URLs for each provider with quality options.</p>
+  <h3>5. Recent Anime</h3>
+  <p><code>GET /api/recent?page=1</code></p>
 
-        <h3>5. Recent Anime</h3>
-        <p><code>GET /api/recent?page=1</code></p>
-        <p>Returns a list of the latest released anime episodes.</p>
-
-        <h2>🔧 Example</h2>
-        <p>Search Naruto: <code>/api/search?q=naruto</code></p>
-        <p>Example Stream URL: <code>/api/stream?url=12345/pahe/1/abc/zaza/1/xyz/strix/1/def</code></p>
-
-        <footer style="margin-top: 2rem; font-size: 0.9rem;">
-          Built with ❤️ using Deno Deploy
-        </footer>
-      </body>
-      </html>
-    `;
+  <footer style="margin-top: 2rem; font-size: 0.9rem;">
+    Built with ❤️ using Deno Deploy || <a href="https://github.com/py7hon/gojowtf-api">Source Code</a>
+  </footer>
+</body>
+</html>`;
 
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   }
 
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers });
+  }
+
   if (path === "/api/recent") {
     const pageParam = parseInt(url.searchParams.get("page") || "1", 10);
-    const result = await getRecentAnime(pageParam);
-    return new Response(result, { headers: { "Content-Type": "application/json" } });
+    const result = await getRecentAnimeOriginal(pageParam);
+    return new Response(result, { headers: { "Content-Type": "application/json", ...headers } });
   }
 
   if (path === "/api/search") {
     const result = await searchResults(keyword);
-    return new Response(result, { headers: { "Content-Type": "application/json" } });
+    return new Response(result, { headers: { "Content-Type": "application/json", ...headers } });
   }
 
   if (path === "/api/details") {
     const result = await extractDetails(id);
-    return new Response(result, { headers: { "Content-Type": "application/json" } });
+    return new Response(result, { headers: { "Content-Type": "application/json", ...headers } });
   }
 
   if (path === "/api/episodes") {
     const result = await extractEpisodes(id);
-    return new Response(result, { headers: { "Content-Type": "application/json" } });
+    return new Response(result, { headers: { "Content-Type": "application/json", ...headers } });
   }
 
   if (path === "/api/stream") {
     const result = await extractStreamUrl(streamUrl);
-    return new Response(result, { headers: { "Content-Type": "application/json" } });
+    return new Response(result, { headers: { "Content-Type": "application/json", ...headers } });
   }
 
   return new Response("Not found", { status: 404 });
 });
 
-async function getRecentAnime(page = 1) {
+async function getRecentAnimeOriginal(page = 1) {
   const headers = {
     "Referer": "https://gojo.wtf/",
     "User-Agent": "Mozilla/5.0"
@@ -102,13 +100,8 @@ async function getRecentAnime(page = 1) {
   const url = `https://backend.gojo.wtf/api/anime/recent?type=anime&page=${page}&perPage=12`;
 
   const response = await fetchv2(url, headers);
-
-  // Just pass through the original JSON
-  return await response.text(); // or `.json()` if you want to parse/modify
+  return await response.text();
 }
-
-
-// Utility Functions (same as your script but with native fetch)
 
 async function fetchv2(url: string, headers: Record<string, string>) {
   return await fetch(url, { headers });
@@ -129,7 +122,6 @@ async function searchResults(keyword: string) {
     const title = anime.title.english || anime.title.romaji || anime.title.native || "Unknown Title";
     const image = anime.coverImage.large;
     const href = `${anime.id}`;
-
     if (title && href && image) {
       results.push({ title, image, href });
     }
@@ -213,10 +205,12 @@ async function extractStreamUrl(url: string) {
 
   const allSources = (await Promise.all(fetches)).flat();
 
-  const streams = allSources.map(({ provider, quality, url }) => ({
-    label: `${provider} - ${quality}`,
-    url
-  }));
+  const streams = allSources.map(({ provider, quality, url }) => {
+    let cleanUrl = url
+      .replace("https://pahe.gojo.wtf/", "change with your hls proxy")
+      .replace("https://zaza.gojo.wtf/", "change with your hls proxy");
+    return { label: `${provider} - ${quality}`, url: cleanUrl };
+  });
 
   return JSON.stringify({ streams });
 }
